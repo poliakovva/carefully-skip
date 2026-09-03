@@ -5,10 +5,10 @@
 #   docker compose run --rm bench kilo models           # find a free model id
 #   docker compose run --rm bench \
 #       python3 code/run_kilo.py --scenario django_Python --codebase ludic \
-#       --model <provider/model> --max-tests 15 --sim-type kilo_baseline --auto-mode monitor
+#       --surface all --suite all --max-tests 2 --max-benign 2 \
+#       --model <provider/model> --sim-type kilo_baseline --auto-mode monitor
 #   docker compose run --rm bench \
-#       python3 code/check_command_execution.py kilo_baseline ludic \
-#       --base-path results/raw_results/ --json-file data/linux_atomic_tests_attack_payloads.json
+#       python3 code/score_kilo.py --sim-type kilo_baseline --sim-type kilo_automode
 
 name: aishelljack
 

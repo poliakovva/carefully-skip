@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Exit } from "effect"
-import { readFile } from "node:fs/promises"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
 import { AutoMode } from "@/kilocode/auto-mode"
 import { AutoModeDeniedError } from "@/kilocode/auto-mode/error"
 
@@ -100,5 +102,24 @@ describe("AutoMode.check (chokepoint entry)", () => {
     expect(line.decision).toBe("allow")
     expect(line.sessionID).toBe("ses_test")
     expect(typeof line.time).toBe("string")
+    expect(typeof line.latency).toBe("number")
+    expect(line.latency).toBeGreaterThanOrEqual(0)
+  })
+
+  test("can isolate benchmark audit output", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "kilo-auto-mode-"))
+    const file = path.join(dir, "audit.jsonl")
+    const prev = process.env["KILO_AUTO_MODE_AUDIT_FILE"]
+    process.env["KILO_AUTO_MODE_AUDIT_FILE"] = file
+    try {
+      const marker = "echo isolated-probe-" + Math.floor(performance.now())
+      await Effect.runPromise(AutoMode.check("bash", { command: marker }, ctx))
+      const contents = await readFile(file, "utf8")
+      expect(contents).toContain(marker)
+    } finally {
+      if (prev === undefined) delete process.env["KILO_AUTO_MODE_AUDIT_FILE"]
+      if (prev !== undefined) process.env["KILO_AUTO_MODE_AUDIT_FILE"] = prev
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })

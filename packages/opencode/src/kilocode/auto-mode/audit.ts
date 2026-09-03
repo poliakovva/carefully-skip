@@ -24,6 +24,8 @@ export interface Entry {
   matched?: string
   /** Operating mode that produced this entry: off | monitor | enforce. */
   mode?: string
+  /** Deterministic policy evaluation time in milliseconds (excludes audit I/O). */
+  latency?: number
 }
 
 const FILE = path.join(Global.Path.log, "auto-mode.jsonl")
@@ -42,7 +44,8 @@ export const record = (entry: Entry): Effect.Effect<void> =>
       ...(entry.rule ? { rule: entry.rule } : {}),
       command: entry.command.slice(0, 500),
     })
-    yield* Effect.promise(() => appendFile(FILE, JSON.stringify(entry) + "\n")).pipe(Effect.catch(() => Effect.void))
+    const file = process.env["KILO_AUTO_MODE_AUDIT_FILE"] || FILE
+    yield* Effect.promise(() => appendFile(file, JSON.stringify(entry) + "\n")).pipe(Effect.catch(() => Effect.void))
   })
 
 export const logFile = FILE

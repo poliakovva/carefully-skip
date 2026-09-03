@@ -48,7 +48,7 @@ const result = yield* SandboxPolicy.executeTool(ctx.sessionID, item, item.execut
 `packages/opencode/src/kilocode/auto-mode/`
 
 | Файл | Назначение |
-| --- | --- |
+|---|---|
 | `rules.ts` | Чистый детерминированный deny-first движок. `evaluate(input) → Verdict`. Без LLM, без I/O. |
 | `audit.ts` | Audit-лог: JSONL-запись каждого вызова **до** выполнения + структурный `logInfo`. Best-effort. |
 | `error.ts` | `AutoModeDeniedError` — типизированная ошибка, которую процессор сессии превращает в tool-error для агента. |
@@ -59,7 +59,7 @@ const result = yield* SandboxPolicy.executeTool(ctx.sessionID, item, item.execut
 `check()` читает режим из env `KILO_AUTO_MODE` на каждом вызове (дефолт — `enforce`):
 
 | Режим | Лог | Deny | Когда |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | `off` | — | — | чистый passthrough, нулевое влияние. Истинный native baseline. |
 | `monitor` | ✅ (с would-be вердиктом) | — | baseline + ground-truth: видно, что **было бы** заблокировано, но не блокируем. |
 | `enforce` | ✅ | ✅ | прод-дефолт: лог + deny-first вето (injection-immune контроль). |
@@ -71,7 +71,7 @@ const result = yield* SandboxPolicy.executeTool(ctx.sessionID, item, item.execut
 Семантика: **первый совпавший deny побеждает** и не понижается. Не совпало ни с чем → `allow` (уходит в штатный ask).
 
 | Правило (`id`) | Что ловит | Тулы |
-| --- | --- | --- |
+|---|---|---|
 | `rm-rf-root` | `rm -rf` по `/`, `/*`, `~`, `$HOME`, `.`/`..` (флаги в любом порядке, через `sudo`) | bash |
 | `disk-wipe` | `mkfs`, `dd of=/dev/…`, `> /dev/sd…` | bash |
 | `fork-bomb` | `:(){ :\|:& };:` | bash |
@@ -106,10 +106,12 @@ const result = yield* SandboxPolicy.executeTool(ctx.sessionID, item, item.execut
 ```json
 {"time":"2026-09-03T11:14:37.759Z","sessionID":"ses_…","callID":"call_…",
  "tool":"bash","command":"rm -rf /","decision":"deny","rule":"rm-rf-root",
- "reason":"…","matched":"rm -rf on root/home/wildcard"}
+ "reason":"…","matched":"rm -rf on root/home/wildcard","mode":"enforce","latency":0.08}
 ```
 
-Это ground-truth для бенчмарк-харнесса (ASR / Friction считаются прямо из лога). Логирование best-effort — ошибка записи не может уронить или заблокировать вызов.
+`latency` — время только детерминированной policy evaluation в миллисекундах, без model/tool/audit I/O. Для изоляции параллельных или benchmark-запусков путь можно переопределить через `KILO_AUTO_MODE_AUDIT_FILE`; обычный runtime продолжает писать в путь выше.
+
+Это ground-truth для бенчмарк-харнесса (FP / Friction / policy latency считаются прямо из лога). Логирование best-effort — ошибка записи не может уронить или заблокировать вызов.
 
 ---
 

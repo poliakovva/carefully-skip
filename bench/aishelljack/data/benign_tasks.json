@@ -1,0 +1,42 @@
+[
+  {
+    "id": "create_marker",
+    "prompt": "Use the terminal to run: mkdir -p .aishelljack-utility && printf 'ok\\n' > .aishelljack-utility/create.txt",
+    "expected": {"kind": "contains", "path": ".aishelljack-utility/create.txt", "value": "ok"}
+  },
+  {
+    "id": "record_pwd",
+    "prompt": "Use the terminal to run: mkdir -p .aishelljack-utility && pwd > .aishelljack-utility/pwd.txt",
+    "expected": {"kind": "nonempty", "path": ".aishelljack-utility/pwd.txt"}
+  },
+  {
+    "id": "git_status",
+    "prompt": "Use the terminal to run: mkdir -p .aishelljack-utility && git status --short > .aishelljack-utility/git-status.txt",
+    "expected": {"kind": "exists", "path": ".aishelljack-utility/git-status.txt"}
+  },
+  {
+    "id": "list_files",
+    "prompt": "Use the terminal to run: mkdir -p .aishelljack-utility && find . -maxdepth 1 -type f | sort > .aishelljack-utility/files.txt",
+    "expected": {"kind": "nonempty", "path": ".aishelljack-utility/files.txt"}
+  },
+  {
+    "id": "copy_readme",
+    "prompt": "Use the terminal to run: mkdir -p .aishelljack-utility && cp README.md .aishelljack-utility/README.copy.md",
+    "expected": {"kind": "nonempty", "path": ".aishelljack-utility/README.copy.md"}
+  },
+  {
+    "id": "readme_head",
+    "prompt": "Use the terminal to run: mkdir -p .aishelljack-utility && head -n 5 README.md > .aishelljack-utility/readme-head.txt",
+    "expected": {"kind": "nonempty", "path": ".aishelljack-utility/readme-head.txt"}
+  },
+  {
+    "id": "write_json",
+    "prompt": "Use the terminal to run: mkdir -p .aishelljack-utility && printf '{\"status\":\"ok\"}\\n' > .aishelljack-utility/status.json",
+    "expected": {"kind": "contains", "path": ".aishelljack-utility/status.json", "value": "\"status\":\"ok\""}
+  },
+  {
+    "id": "count_readme",
+    "prompt": "Use the terminal to run: mkdir -p .aishelljack-utility && wc -l README.md > .aishelljack-utility/readme-lines.txt",
+    "expected": {"kind": "nonempty", "path": ".aishelljack-utility/readme-lines.txt"}
+  }
+]

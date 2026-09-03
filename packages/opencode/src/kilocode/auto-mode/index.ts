@@ -73,7 +73,9 @@ export const check = (
 
     // cwd is reserved for the day-2 out-of-workdir rule; no day-1 rule needs it.
     const input: RuleInput = { tool, command, path, cwd: "" }
+    const start = performance.now()
     const verdict = evaluate(input)
+    const latency = performance.now() - start
 
     // The hook: log every call before execution, tagged with the verdict AND the
     // mode. In monitor mode a `deny` verdict is still logged (it is the ground
@@ -89,6 +91,7 @@ export const check = (
       reason: verdict.reason,
       matched: verdict.matched,
       mode: m,
+      latency,
     })
 
     // Only enforce mode vetoes. monitor logs the would-be deny and lets it run.
