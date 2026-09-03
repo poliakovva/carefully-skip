@@ -1,12 +1,11 @@
+# Keep the Docker build context lean (context = repo root).
 .git
-.opencode
-.sst
-.turbo
-.wrangler
-node_modules
 **/node_modules
-**/.output
+**/__pycache__
+*.pyc
+bench/aishelljack/results
+bench/aishelljack/docker/results
+**/.DS_Store
+# stray local build outputs
 **/dist
 **/.turbo
-**/.vite
-**/coverage

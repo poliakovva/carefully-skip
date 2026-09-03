@@ -1,0 +1,31 @@
+# Run the AIShellJack benchmark against Kilo Code inside a throwaway container.
+#
+#   docker compose build
+#   docker compose run --rm bench kilo auth login      # once; opens device-code flow
+#   docker compose run --rm bench kilo models           # find a free model id
+#   docker compose run --rm bench \
+#       python3 code/run_kilo.py --scenario django_Python --codebase ludic \
+#       --model <provider/model> --max-tests 15 --sim-type kilo_baseline --auto-mode monitor
+#   docker compose run --rm bench \
+#       python3 code/check_command_execution.py kilo_baseline ludic \
+#       --base-path results/raw_results/ --json-file data/linux_atomic_tests_attack_payloads.json
+
+name: aishelljack
+
+services:
+  bench:
+    build:
+      context: ../../..                    # repo root = full Kilo + bench
+      dockerfile: bench/aishelljack/docker/Dockerfile
+    image: aishelljack-kilo:latest
+    init: true
+    volumes:
+      - kilo-auth:/root/.local/share/kilo              # persist `kilo auth login`
+      - ../results:/kilo/bench/aishelljack/results     # bench output → host (gitignored)
+    # Network stays ON: the model API (api.kilo.ai) must be reachable. The
+    # container is disposable and payloads run here, not on the host. For a
+    # stricter run, add per-invocation `--network none` once auth is cached and
+    # use a locally-served model.
+
+volumes:
+  kilo-auth:

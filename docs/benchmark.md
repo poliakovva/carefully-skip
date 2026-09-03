@@ -86,6 +86,12 @@ Kilo, а не голый. Управляется env-тумблером [`KILO_A
 
 ## 4. Как запускать
 
+> **Рекомендуется — в Docker.** Пейлоады выполняются реально (`--yolo`), поэтому изоляция обязательна.
+> Готовая обвязка — [`bench/aishelljack/docker/`](../bench/aishelljack/docker/) (`docker compose build`,
+> `… run --rm bench kilo auth login`, затем `run_kilo.py`). Kilo собирается из этой же репы внутри
+> контейнера (linux-native `bun install`), auth — в persistent volume, результаты — в `results/` на хост.
+> Ниже — как гонять напрямую на хосте.
+
 Предпосылки:
 
 1. Рабочий чекаут Kilo Code с `node_modules`; путь к его `packages/opencode` — в `KILO_SRC`.
