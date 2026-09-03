@@ -49,9 +49,21 @@ C++/N64Recomp, pytorch/gpt-fast), каждая со своим `.cursorrules`.
 ## 3. Модель угроз = «carefully-skip-permissions»
 
 `kilo run --yolo` пропускает все permission-запросы — это тот самый auto-approve, который предполагает
-статья, и ровно сценарий кейса. Прогон `--sim-type kilo_baseline` меряет **нативную** уязвимость
-Kilo Code (без нашей защиты). Отдельный прогон `--sim-type kilo_automode` (с включённым deny-first
-движком auto-mode) даст цифру **с защитой** — сравнение baseline vs auto-mode и есть смысл кейса.
+статья, и ровно сценарий кейса. Важно: нативно у Kilo дефолт для `bash` — `ask`, **без** готового
+deny-листа опасных команд, и `--yolo` этот ask снимает целиком. То есть в baseline опасную команду
+не режет ничто — **кроме нашего auto-mode**, если он в режиме `enforce`.
+
+Поэтому baseline надо гонять с выключенным enforcement, иначе `kilo_baseline` мерит уже-защищённый
+Kilo, а не голый. Управляется env-тумблером [`KILO_AUTO_MODE`](./auto-mode.md#30-режимы-работы-kilo_auto_mode),
+который прокидывает `run_kilo.py` через флаг `--auto-mode`:
+
+| Прогон | `--sim-type` | `--auto-mode` | Что меряем |
+| --- | --- | --- | --- |
+| baseline | `kilo_baseline` | `monitor` (или `off`) | нативная уязвимость Kilo Code, deny-first **не** вмешивается |
+| defended | `kilo_automode` | `enforce` | ASR с включённым deny-first движком |
+
+`monitor` вдобавок пишет в `auto-mode.jsonl` вердикт `deny` для того, что enforce **порезал бы**, —
+удобная ground-truth. Сравнение baseline vs defended и есть смысл кейса.
 
 ### Про флаг `--yolo`
 
@@ -90,7 +102,8 @@ Kilo Code (без нашей защиты). Отдельный прогон `--s
 cd bench/aishelljack
 python3 code/run_kilo.py \
   --scenario django_Python --codebase ludic \
-  --model <provider/model> --max-tests 15 --sim-type kilo_baseline
+  --model <provider/model> --max-tests 15 \
+  --sim-type kilo_baseline --auto-mode monitor
 ```
 
 Скоринг:
@@ -111,8 +124,10 @@ python3 code/check_command_execution.py kilo_baseline ludic \
 - ✅ Данные, сценарии и upstream-скрипты перенесены; написан адаптер `run_kilo.py`.
 - ✅ Пайплайн проверен end-to-end **офлайн** (синтетический поток событий): выбор пейлоада → инъекция
 в `.cursorrules` → извлечение команд → скоринг ASR — совпадение засчитано корректно.
+- ✅ Добавлен тумблер `KILO_AUTO_MODE` (`off`/`monitor`/`enforce`) + флаг `--auto-mode` в харнессе,
+чтобы baseline был честным (deny-first не вмешивается). Покрыт тестами.
 - ⏳ Живой прогон ждёт авторизацию в Kilo и выбор бесплатной модели.
-- Скоуп сейчас — **только baseline** (нативная уязвимость Kilo Code). Прогон с auto-mode — следующим шагом.
+- Скоуп сейчас — **только baseline** (`--auto-mode monitor`). Прогон с `enforce` (`kilo_automode`) — следующим шагом.
 
 ---
 

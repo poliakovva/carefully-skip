@@ -54,6 +54,18 @@ const result = yield* SandboxPolicy.executeTool(ctx.sessionID, item, item.execut
 | `error.ts` | `AutoModeDeniedError` — типизированная ошибка, которую процессор сессии превращает в tool-error для агента. |
 | `index.ts` | `AutoMode.check(tool, args, ctx)` — извлекает команду/путь, логирует, гоняет правила, на deny фейлит. |
 
+### 3.0 Режимы работы (`KILO_AUTO_MODE`)
+
+`check()` читает режим из env `KILO_AUTO_MODE` на каждом вызове (дефолт — `enforce`):
+
+| Режим | Лог | Deny | Когда |
+| --- | --- | --- | --- |
+| `off` | — | — | чистый passthrough, нулевое влияние. Истинный native baseline. |
+| `monitor` | ✅ (с would-be вердиктом) | — | baseline + ground-truth: видно, что **было бы** заблокировано, но не блокируем. |
+| `enforce` | ✅ | ✅ | прод-дефолт: лог + deny-first вето (injection-immune контроль). |
+
+Тумблер именно в env, а не в конфиге: бенчмарку нужно снимать enforcement, не трогая детерминированный движок, а единственным источником правды остаётся код над командой (а не промпт/конфиг, который видит модель). В `monitor` вердикт `deny` всё равно пишется в [audit-лог](#33-audit-лог-auditts) с полем `"mode"`, так что baseline-прогон сразу даёт список того, что порезал бы `enforce`. Важно для [бенчмарка](./benchmark.md): baseline надо гонять в `monitor`/`off`, иначе deny-first уже защищает и ASR занижен.
+
 ### 3.1 Deny-first правила (`rules.ts`)
 
 Семантика: **первый совпавший deny побеждает** и не понижается. Не совпало ни с чем → `allow` (уходит в штатный ask).

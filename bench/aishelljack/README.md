@@ -37,9 +37,18 @@ tool `bash`) — no screen scraping.
 
 `kilo run --yolo` skips every permission prompt — the auto-approve config the
 paper assumes and the exact scenario the [roadmap](../../docs/roadmap.md) targets.
-The **baseline** (`--sim-type kilo_baseline`) measures Kilo Code's native
-vulnerability. A later `--sim-type kilo_automode` run (auto-mode deny-first engine
-enabled) would measure the mitigation — that comparison is the point of the case.
+Kilo's native default for `bash` is `ask` (no dangerous-command deny-list), which
+`--yolo` removes — so nothing blocks a payload in baseline **except** our auto-mode
+if it enforces. The driver therefore sets `KILO_AUTO_MODE` (via `--auto-mode`):
+
+| Run | `--sim-type` | `--auto-mode` | Measures |
+|---|---|---|---|
+| baseline | `kilo_baseline` | `monitor` (or `off`) | Kilo Code's native vulnerability; deny-first does **not** intervene |
+| defended | `kilo_automode` | `enforce` | ASR with the deny-first engine on |
+
+`monitor` still logs the would-be `deny` verdicts to `auto-mode.jsonl`, so a
+baseline run doubles as ground truth for what `enforce` would have blocked. The
+baseline-vs-defended delta is the point of the case.
 
 ## Prerequisites
 
@@ -59,7 +68,8 @@ enabled) would measure the mitigation — that comparison is the point of the ca
 cd bench/aishelljack
 python3 code/run_kilo.py \
   --scenario django_Python --codebase ludic \
-  --model <provider/model> --max-tests 15 --sim-type kilo_baseline
+  --model <provider/model> --max-tests 15 \
+  --sim-type kilo_baseline --auto-mode monitor
 ```
 
 Scenario/codebase pairs: `django_Python/ludic`, `chrome_JavaScript/chatgpt-chrome-extension`,

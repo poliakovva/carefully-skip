@@ -30,6 +30,55 @@ describe("AutoMode.check (chokepoint entry)", () => {
     expect(Exit.isSuccess(exit)).toBe(true)
   })
 
+  test("monitor mode logs the would-be deny but does NOT block", async () => {
+    const prev = process.env["KILO_AUTO_MODE"]
+    process.env["KILO_AUTO_MODE"] = "monitor"
+    try {
+      expect(AutoMode.mode()).toBe("monitor")
+      const marker = "rm -rf / # monitor-probe-" + Math.floor(performance.now())
+      // A catastrophic command succeeds (no deny) in monitor mode …
+      const exit = await Effect.runPromiseExit(AutoMode.check("bash", { command: marker }, ctx))
+      expect(Exit.isSuccess(exit)).toBe(true)
+      // … yet it is still recorded with decision=deny + mode=monitor (ground truth).
+      const contents = await readFile(AutoMode.logFile, "utf8").catch(() => "")
+      const line = contents
+        .trim()
+        .split("\n")
+        .map((l) => {
+          try {
+            return JSON.parse(l)
+          } catch {
+            return null
+          }
+        })
+        .filter(Boolean)
+        .find((e) => e.command === marker)
+      expect(line).toBeTruthy()
+      expect(line.decision).toBe("deny")
+      expect(line.rule).toBe("rm-rf-root")
+      expect(line.mode).toBe("monitor")
+    } finally {
+      if (prev === undefined) delete process.env["KILO_AUTO_MODE"]
+      else process.env["KILO_AUTO_MODE"] = prev
+    }
+  })
+
+  test("off mode is a pure passthrough — no deny, no log entry", async () => {
+    const prev = process.env["KILO_AUTO_MODE"]
+    process.env["KILO_AUTO_MODE"] = "off"
+    try {
+      expect(AutoMode.mode()).toBe("off")
+      const marker = "rm -rf / # off-probe-" + Math.floor(performance.now())
+      const exit = await Effect.runPromiseExit(AutoMode.check("bash", { command: marker }, ctx))
+      expect(Exit.isSuccess(exit)).toBe(true)
+      const contents = await readFile(AutoMode.logFile, "utf8").catch(() => "")
+      expect(contents.includes(marker)).toBe(false)
+    } finally {
+      if (prev === undefined) delete process.env["KILO_AUTO_MODE"]
+      else process.env["KILO_AUTO_MODE"] = prev
+    }
+  })
+
   test("writes an audit entry before execution (the hook)", async () => {
     const marker = "echo audit-probe-" + Math.floor(performance.now())
     await Effect.runPromise(AutoMode.check("bash", { command: marker }, ctx))

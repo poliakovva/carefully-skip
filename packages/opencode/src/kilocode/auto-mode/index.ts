@@ -19,6 +19,26 @@ export { evaluate, type Verdict, type RuleInput } from "./rules"
 
 const FILE_TOOLS = new Set(["write", "edit", "apply_patch"])
 
+/**
+ * Operating mode, resolved per call from `KILO_AUTO_MODE` (default: enforce):
+ *   • off     — pure passthrough: no logging, no deny. Use for a TRUE native
+ *               baseline (measures the agent with zero auto-mode influence).
+ *   • monitor — log every call tagged with the would-be verdict, but NEVER deny.
+ *               Baseline that still yields the audit-log ground truth.
+ *   • enforce — log + deny-first veto (production default; the injection-immune
+ *               control the case requires).
+ *
+ * Why an env switch and not config: the benchmark needs to flip enforcement
+ * without touching the deterministic engine, and code over the concrete call
+ * must stay the single source of truth (not a prompt/config the model sees).
+ */
+export type Mode = "off" | "monitor" | "enforce"
+
+export function mode(): Mode {
+  const v = (process.env["KILO_AUTO_MODE"] ?? "").trim().toLowerCase()
+  return v === "off" || v === "monitor" ? v : "enforce"
+}
+
 /** Extract the security-relevant command string and file path from a tool call. */
 function extract(tool: string, args: Record<string, unknown>): { command: string; path: string; summary: string } {
   if (tool === "bash") {
@@ -45,13 +65,19 @@ export const check = (
   ctx: { sessionID: string; callID?: string },
 ): Effect.Effect<void, AutoModeDeniedError> =>
   Effect.gen(function* () {
+    const m = mode()
+    // off: zero influence — do not even log, so a baseline run is truly native.
+    if (m === "off") return
+
     const { command, path, summary } = extract(tool, args)
 
     // cwd is reserved for the day-2 out-of-workdir rule; no day-1 rule needs it.
     const input: RuleInput = { tool, command, path, cwd: "" }
     const verdict = evaluate(input)
 
-    // The hook: log every call before execution, tagged with the verdict.
+    // The hook: log every call before execution, tagged with the verdict AND the
+    // mode. In monitor mode a `deny` verdict is still logged (it is the ground
+    // truth of "what WOULD have been blocked") but not enforced.
     yield* Audit.record({
       time: new Date().toISOString(),
       sessionID: ctx.sessionID,
@@ -62,9 +88,11 @@ export const check = (
       rule: verdict.rule,
       reason: verdict.reason,
       matched: verdict.matched,
+      mode: m,
     })
 
-    if (verdict.decision === "deny") {
+    // Only enforce mode vetoes. monitor logs the would-be deny and lets it run.
+    if (m === "enforce" && verdict.decision === "deny") {
       return yield* new AutoModeDeniedError({
         rule: verdict.rule ?? "unknown",
         reason: verdict.reason ?? "Blocked by policy.",

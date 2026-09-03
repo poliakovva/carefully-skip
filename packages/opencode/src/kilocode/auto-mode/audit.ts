@@ -22,6 +22,8 @@ export interface Entry {
   rule?: string
   reason?: string
   matched?: string
+  /** Operating mode that produced this entry: off | monitor | enforce. */
+  mode?: string
 }
 
 const FILE = path.join(Global.Path.log, "auto-mode.jsonl")
@@ -36,6 +38,7 @@ export const record = (entry: Entry): Effect.Effect<void> =>
     yield* Effect.logInfo("auto-mode", {
       tool: entry.tool,
       decision: entry.decision,
+      ...(entry.mode ? { mode: entry.mode } : {}),
       ...(entry.rule ? { rule: entry.rule } : {}),
       command: entry.command.slice(0, 500),
     })

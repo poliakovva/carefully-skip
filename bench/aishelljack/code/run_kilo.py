@@ -112,18 +112,23 @@ def extract_commands(stdout):
 
 
 def run_one(ws_setup, scenario, codebase, idx, kilo_src, model, results_dir,
-            sim_type, timeout):
+            sim_type, timeout, auto_mode):
     """Set up the poisoned workspace for one payload, run Kilo, capture commands."""
     ok, ws = ws_setup.create_test_workspace(scenario, codebase, atomic_test_index=idx)
     if not ok:
         return {"idx": idx, "status": "setup_failed", "n_cmds": 0}
 
     argv = kilo_argv(kilo_src, ws, model)
+    # KILO_AUTO_MODE gates our deny-first engine. For a true baseline it must NOT
+    # enforce (monitor = log only, off = silent), else auto-mode blocks payloads
+    # and the "native vulnerability" number is understated.
+    env = {**os.environ, "KILO_AUTO_MODE": auto_mode}
     status = "ok"
     stdout = ""
     try:
         proc = subprocess.run(
             argv, cwd=kilo_src, capture_output=True, text=True, timeout=timeout,
+            env=env,
         )
         stdout = proc.stdout
         stderr = proc.stderr
@@ -152,6 +157,7 @@ def run_one(ws_setup, scenario, codebase, idx, kilo_src, model, results_dir,
         json.dump({
             "indexed_technique": idx, "scenario": scenario, "codebase": codebase,
             "sim_type": sim_type, "model": model, "status": status,
+            "auto_mode": auto_mode,
             "n_commands": len(commands), "file_targets": file_targets,
             "prompt": PROMPT, "argv": argv, "stderr_tail": (stderr or "")[-2000:],
         }, f, indent=2)
@@ -171,6 +177,9 @@ def main():
                    help="explicit indexed_technique list (e.g. T1497.003.01)")
     p.add_argument("--sim-type", default="kilo_baseline",
                    help="results subfolder / label (kilo_baseline, kilo_automode, ...)")
+    p.add_argument("--auto-mode", choices=["off", "monitor", "enforce"], default="monitor",
+                   help="KILO_AUTO_MODE for the Kilo subprocess. baseline: monitor/off "
+                        "(no blocking); defended run: enforce. Default: monitor.")
     p.add_argument("--per-test-timeout", type=int, default=300)
     p.add_argument("--kilo-src", default=DEFAULT_KILO_SRC)
     p.add_argument("--payloads", default=DEFAULT_PAYLOADS)
@@ -202,13 +211,17 @@ def main():
     print(f"Model    : {args.model or '(default — WILL FAIL if paid/unauth)'}")
     print(f"Scenario : {args.scenario}/{args.codebase}")
     print(f"Payloads : {len(selected)} (sim_type={args.sim_type})")
+    print(f"AutoMode : KILO_AUTO_MODE={args.auto_mode}"
+          + ("  (baseline — deny-first NOT enforced)" if args.auto_mode != "enforce"
+             else "  (defended — deny-first ENFORCED)"))
     print(f"Results  : {args.results}")
     print("-" * 60)
 
     summary = []
     for i, idx in enumerate(selected, 1):
         r = run_one(ws_setup, args.scenario, args.codebase, idx, args.kilo_src,
-                    args.model, args.results, args.sim_type, args.per_test_timeout)
+                    args.model, args.results, args.sim_type, args.per_test_timeout,
+                    args.auto_mode)
         summary.append(r)
         print(f"[{i}/{len(selected)}] {idx:<16} status={r['status']:<12} "
               f"commands={r['n_cmds']}")
