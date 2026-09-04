@@ -2,6 +2,7 @@
 """Run the AIShellJack attack and benign-utility suites against Kilo Code."""
 
 import argparse
+import concurrent.futures as cf
 import datetime as dt
 import json
 import os
@@ -315,6 +316,33 @@ def pairs(args, setup, parser):
     parser.error("pass --scenario and --codebase together, or use --all-scenarios")
 
 
+def build_jobs(repos, names, selected, benign, suite):
+    jobs = []
+    if suite in ("attacks", "all"):
+        for scenario, codebase in repos:
+            for surface in names:
+                for idx in selected:
+                    jobs.append(("attack", scenario, codebase, surface, idx))
+    if suite in ("benign", "all"):
+        for scenario, codebase in repos:
+            for task in benign:
+                jobs.append(("benign", scenario, codebase, task))
+    return jobs
+
+
+def run_job(setup, job, args):
+    kind = job[0]
+    if kind == "attack":
+        _, scenario, codebase, surface, idx = job
+        item = run_attack(setup, scenario, codebase, idx, surface, args)
+        label = f"attack {surface}/{codebase}/{idx} status={item['status']} commands={item['n_commands']}"
+    else:
+        _, scenario, codebase, task = job
+        item = run_benign(setup, scenario, codebase, task, args)
+        label = f"benign {codebase}/{task['id']} status={item['status']} success={item['success']}"
+    return item, label
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run the full AIShellJack harness against Kilo Code")
     parser.add_argument("--scenario", help="e.g. django_Python")
@@ -336,6 +364,13 @@ def main():
     parser.add_argument("--results", default=DEFAULT_RESULTS)
     parser.add_argument("--workspaces", help="workspace scratch dir (default: a temp dir)")
     parser.add_argument("--resume", action="store_true", help="reuse runs that already have meta.json")
+    parser.add_argument("--workers", type=int, default=1, help="concurrent Kilo invocations (default: 1, sequential)")
+    parser.add_argument(
+        "--retry-timeouts",
+        type=int,
+        default=0,
+        help="extra in-process passes that re-run timeout/error/setup_failed jobs (for flaky free-tier models)",
+    )
     args = parser.parse_args()
 
     with open(args.payloads, encoding="utf-8") as file:
@@ -362,43 +397,53 @@ def main():
     root = args.workspaces or tempfile.mkdtemp(prefix="aishelljack_ws_")
     setup = WorkspaceSetup(args.repos, root, args.payloads)
     repos = pairs(args, setup, parser)
-    total = (len(repos) * len(names) * len(selected) if args.suite in ("attacks", "all") else 0) + (
-        len(repos) * len(benign) if args.suite in ("benign", "all") else 0
-    )
+    jobs = build_jobs(repos, names, selected, benign, args.suite)
+    total = len(jobs)
 
     print(f"Kilo src : {args.kilo_src}")
     print(f"Model    : {args.model or '(default — may require authentication)'}")
     print(f"Suites   : {args.suite}")
     print(f"Repos    : {len(repos)}")
     print(f"Surfaces : {', '.join(names)}")
-    print(f"Runs     : {total} (auto_mode={args.auto_mode})")
+    print(f"Runs     : {total} (auto_mode={args.auto_mode}, workers={args.workers})")
     print(f"Results  : {args.results}")
     print("-" * 60)
 
-    summary = []
-    count = 0
-    if args.suite in ("attacks", "all"):
-        for scenario, codebase in repos:
-            for surface in names:
-                for idx in selected:
-                    count += 1
-                    item = run_attack(setup, scenario, codebase, idx, surface, args)
-                    summary.append(item)
-                    print(
-                        f"[{count}/{total}] attack {surface}/{codebase}/{idx} "
-                        f"status={item['status']} commands={item['n_commands']}"
-                    )
-    if args.suite in ("benign", "all"):
-        for scenario, codebase in repos:
-            for task in benign:
-                count += 1
-                item = run_benign(setup, scenario, codebase, task, args)
-                summary.append(item)
-                print(
-                    f"[{count}/{total}] benign {codebase}/{task['id']} "
-                    f"status={item['status']} success={item['success']}"
-                )
+    results = {}
 
+    def process(index, job):
+        item, label = run_job(setup, job, args)
+        results[index] = item
+        return label
+
+    def run_batch(indices, prefix=""):
+        count = 0
+        if args.workers > 1:
+            with cf.ThreadPoolExecutor(max_workers=args.workers) as pool:
+                futures = {pool.submit(process, i, jobs[i]): i for i in indices}
+                for future in cf.as_completed(futures):
+                    label = future.result()
+                    count += 1
+                    print(f"{prefix}[{count}/{len(indices)}] {label}")
+        else:
+            for i in indices:
+                label = process(i, jobs[i])
+                count += 1
+                print(f"{prefix}[{count}/{len(indices)}] {label}")
+
+    run_batch(range(total))
+
+    retries_left = args.retry_timeouts
+    while retries_left > 0:
+        todo = [i for i, item in results.items() if item["status"] not in ("ok", "cached")]
+        if not todo:
+            break
+        print("-" * 60)
+        print(f"Retry pass ({len(todo)} unresolved, {retries_left} passes left)")
+        run_batch(todo, prefix="retry ")
+        retries_left -= 1
+
+    summary = [results[i] for i in range(total)]
     ok = sum(1 for item in summary if item["status"] in ("ok", "cached"))
     print("-" * 60)
     print(f"Runs: {len(summary)}  ok={ok}")

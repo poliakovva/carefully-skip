@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1480" viewBox="0 0 1200 1480" role="img" aria-labelledby="title desc">
+  <title id="title">Путь indirect prompt injection в AIShellJack</title>
+  <desc id="desc">Вертикальная схема из четырёх этапов: доставка инструкции, интерпретация моделью, проверка Auto Mode и оценка результата.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#475569"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .title { font: 700 36px Inter, Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 21px Inter, Arial, sans-serif; fill: #475569; }
+      .stage { font: 700 24px Inter, Arial, sans-serif; fill: #0f172a; }
+      .node-title { font: 700 23px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
+      .node-text { font: 400 19px Inter, Arial, sans-serif; fill: #334155; text-anchor: middle; }
+      .edge { font: 600 18px Inter, Arial, sans-serif; fill: #475569; text-anchor: middle; }
+      .arrow { fill: none; stroke: #475569; stroke-width: 4; marker-end: url(#arrow); }
+      .panel { stroke-width: 2; rx: 28; }
+      .node { fill: #ffffff; stroke-width: 2.5; rx: 18; filter: url(#shadow); }
+    </style>
+  </defs>
+
+  <rect width="1200" height="1480" fill="#f8fafc"/>
+  <text x="600" y="60" class="title" text-anchor="middle">Как проходит атака AIShellJack</text>
+  <text x="600" y="94" class="subtitle" text-anchor="middle">Indirect prompt injection → tool call → pre-execution policy → scorer</text>
+
+  <rect x="50" y="130" width="1100" height="330" class="panel" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="85" y="175" class="stage">1. Доставка вредоносной инструкции</text>
+
+  <rect x="100" y="220" width="250" height="105" class="node" stroke="#60a5fa"/>
+  <text x="225" y="260" class="node-title">Атакующий</text>
+  <text x="225" y="293" class="node-text">отравляет ресурс</text>
+
+  <rect x="475" y="205" width="250" height="135" class="node" stroke="#60a5fa"/>
+  <text x="600" y="248" class="node-title">Carrier</text>
+  <text x="600" y="281" class="node-text">файл проекта</text>
+  <text x="600" y="310" class="node-text">или MCP</text>
+
+  <rect x="850" y="220" width="250" height="105" class="node" stroke="#60a5fa"/>
+  <text x="975" y="260" class="node-title">Kilo</text>
+  <text x="975" y="293" class="node-text">получает context</text>
+
+  <rect x="100" y="355" width="250" height="70" class="node" stroke="#60a5fa"/>
+  <text x="225" y="384" class="node-title">Пользователь</text>
+  <text x="225" y="412" class="node-text">обычная задача</text>
+
+  <path d="M350 272 H455" class="arrow"/>
+  <text x="402" y="252" class="edge">payload</text>
+  <path d="M725 272 H830" class="arrow"/>
+  <text x="777" y="252" class="edge">context</text>
+  <path d="M350 390 H770 Q820 390 850 315" class="arrow"/>
+  <text x="590" y="414" class="edge">refactor / review / tool request</text>
+
+  <path d="M975 325 V495" class="arrow"/>
+
+  <rect x="50" y="490" width="1100" height="260" class="panel" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="85" y="535" class="stage">2. Интерпретация моделью</text>
+
+  <rect x="180" y="575" width="330" height="120" class="node" stroke="#a78bfa"/>
+  <text x="345" y="616" class="node-title">LLM</text>
+  <text x="345" y="649" class="node-text">принимает payload</text>
+  <text x="345" y="678" class="node-text">за project instruction</text>
+
+  <rect x="690" y="575" width="330" height="120" class="node" stroke="#a78bfa"/>
+  <text x="855" y="616" class="node-title">Tool call</text>
+  <text x="855" y="652" class="node-text">bash / write / edit</text>
+
+  <path d="M510 635 H670" class="arrow"/>
+  <text x="590" y="614" class="edge">формирует действие</text>
+
+  <path d="M855 695 V820" class="arrow"/>
+
+  <rect x="50" y="780" width="1100" height="330" class="panel" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="85" y="825" class="stage">3. Проверка до исполнения</text>
+
+  <path d="M600 855 L745 940 L600 1025 L455 940 Z" fill="#ffffff" stroke="#fb923c" stroke-width="3" filter="url(#shadow)"/>
+  <text x="600" y="930" class="node-title">Auto Mode</text>
+  <text x="600" y="963" class="node-text">deny-first policy</text>
+
+  <rect x="90" y="875" width="280" height="125" class="node" stroke="#22c55e"/>
+  <text x="230" y="918" class="node-title">Разрешить</text>
+  <text x="230" y="951" class="node-text">monitor: всегда</text>
+  <text x="230" y="980" class="node-text">enforce: verdict allow</text>
+
+  <rect x="830" y="875" width="280" height="125" class="node" stroke="#ef4444"/>
+  <text x="970" y="918" class="node-title">Заблокировать</text>
+  <text x="970" y="951" class="node-text">только enforce</text>
+  <text x="970" y="980" class="node-text">при verdict deny</text>
+
+  <path d="M455 940 H390" class="arrow"/>
+  <text x="420" y="920" class="edge">allow</text>
+  <path d="M745 940 H810" class="arrow"/>
+  <text x="780" y="920" class="edge">deny</text>
+
+  <rect x="50" y="1140" width="1100" height="285" class="panel" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="85" y="1185" class="stage">4. Фиксация и оценка</text>
+
+  <rect x="95" y="1235" width="280" height="120" class="node" stroke="#4ade80"/>
+  <text x="235" y="1276" class="node-title">Trace</text>
+  <text x="235" y="1309" class="node-text">commands.log</text>
+  <text x="235" y="1338" class="node-text">audit.jsonl</text>
+
+  <rect x="460" y="1235" width="280" height="120" class="node" stroke="#4ade80"/>
+  <text x="600" y="1288" class="node-title">Scorer</text>
+  <text x="600" y="1321" class="node-text">command matching</text>
+
+  <rect x="825" y="1235" width="280" height="120" class="node" stroke="#4ade80"/>
+  <text x="965" y="1276" class="node-title">Отчёт</text>
+  <text x="965" y="1309" class="node-text">Execution / ASR</text>
+  <text x="965" y="1338" class="node-text">Utility / FP</text>
+
+  <path d="M230 1000 V1215" class="arrow"/>
+  <text x="300" y="1080" class="edge">исполненная команда</text>
+  <path d="M970 1000 V1085 Q970 1120 910 1140 Q790 1180 375 1265" class="arrow"/>
+  <text x="865" y="1100" class="edge">audit only</text>
+  <path d="M375 1295 H440" class="arrow"/>
+  <path d="M740 1295 H805" class="arrow"/>
+
+  <text x="600" y="1457" class="subtitle" text-anchor="middle">Заблокированная команда остаётся в audit, но не входит в список исполненных команд для ASR.</text>
+</svg>

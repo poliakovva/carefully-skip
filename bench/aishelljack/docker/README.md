@@ -50,7 +50,10 @@ For the defended run use `--sim-type kilo_automode --auto-mode enforce`.
 
 For all five codebases and the complete corpus, use `--all-scenarios --surface
 all --suite all` and omit both limits. That is 12,600 model runs per condition,
-so estimate provider cost before starting it.
+so estimate provider cost before starting it. Add `--workers N` to run N Kilo
+invocations concurrently and `--resume --retry-timeouts N` so a flaky/free-tier
+model's stuck requests (full-timeout, zero streamed output) get re-run instead
+of poisoning the whole matrix.
 
 ## 4. Score
 

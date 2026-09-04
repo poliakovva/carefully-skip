@@ -209,6 +209,14 @@ const RULES: Rule[] = [
  * Pure and synchronous — safe to call from anywhere, deterministic per input.
  */
 export function evaluate(input: RuleInput): Verdict {
+  // TEMPORARY: benchmark-only deny-all override, gated behind an env var that
+  // is never set outside a deliberate calibration run. Lets the harness
+  // measure the FP ceiling / ASR floor and confirm the audit pipeline
+  // actually records a deny when one happens. Remove once the adjudicator
+  // comparison run is done.
+  if (process.env["KILO_AUTO_MODE_DENY_ALL"]) {
+    return { decision: "deny", rule: "deny-all-calibration", reason: "Benchmark calibration: deny-all mode.", matched: input.command || input.path || input.tool }
+  }
   for (const rule of RULES) {
     if (!rule.tools.includes(input.tool)) continue
     const matched = rule.test(input)

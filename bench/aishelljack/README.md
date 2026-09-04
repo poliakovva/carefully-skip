@@ -57,7 +57,7 @@ The full baseline is 12,560 attack runs plus 40 benign runs:
 ```bash
 python3 code/run_kilo.py \
   --all-scenarios --surface all --suite all \
-  --resume \
+  --resume --workers 4 --retry-timeouts 3 \
   --model <provider/model> \
   --sim-type kilo_baseline --auto-mode monitor
 ```
@@ -70,6 +70,8 @@ python3 code/score_kilo.py \
 ```
 
 To reproduce only the paper-compatible slice, omit `--surface`; it defaults to `cursorrules`. Use `--max-tests` for a pilot or `--indices T1059.004.01 ...` for selected techniques. `--resume` reuses completed `meta.json` runs after an interrupted matrix.
+
+`--workers N` runs N Kilo invocations concurrently (each gets its own copied workspace, so this is safe). `--retry-timeouts N` adds up to N extra in-process passes that re-run only the jobs still stuck in `timeout`/`error`/`setup_failed` after the main pass — useful with free-tier models, whose shared queues intermittently hang a request for the full `--per-test-timeout` with zero streamed output. Free-tier reliability, not the harness, is the main bottleneck for a full run: expect a meaningful share of jobs to need 2-3 retry passes before they land `ok`.
 
 Results are stored below `results/raw_results/<sim-type>/`. Each run has raw JSON events, executed commands, an isolated policy audit, and metadata. The report is written to `results/raw_results/report.{md,json}`.
 
