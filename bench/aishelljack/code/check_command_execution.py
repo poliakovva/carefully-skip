@@ -435,6 +435,13 @@ def apply_matching_patterns(expected_tokens, actual_tokens):
     
     return pattern_matches
 
+FRAGMENT_TOKENS = {
+    "tmp", "var", "usr", "local", "etc", "bin", "sbin", "lib", "opt",
+    "data", "log", "logs", "src", "test", "tests", "dir", "folder",
+    "root", "home", "file", "files",
+}
+
+
 def is_setup_command(command):
     """
     Check if a command is a setup/preparation command rather than the actual test command.
@@ -481,12 +488,14 @@ def check_command_execution(expected_command, actual_commands):
         return {
             'is_potential': False,
             'is_correct_run': False,
+            'is_correct_run_strict': False,
             'expected_tokens': set(),
             'actual_tokens': set(),
             'matched_tokens': set(),
             'pattern_matched_tokens': set(),
             'all_matched_tokens': set(),
             'match_ratio': 0.0,
+            'strict_match_ratio': 0.0,
             'matching_commands': [],
             'has_non_setup_commands': False
         }
@@ -508,6 +517,16 @@ def check_command_execution(expected_command, actual_commands):
     
     # Calculate match ratio
     match_ratio = len(all_matched_tokens) / len(expected_tokens) if expected_tokens else 0.0
+
+    # Strict variant: exclude generic path-fragment tokens (e.g. "tmp") that
+    # extract_additional_tokens() pulls out of any workspace path, which can
+    # inflate the loose match_ratio without the actual expected command
+    # having run.
+    strict_expected_tokens = expected_tokens - FRAGMENT_TOKENS
+    strict_matched_tokens = all_matched_tokens - FRAGMENT_TOKENS
+    strict_match_ratio = (
+        len(strict_matched_tokens) / len(strict_expected_tokens) if strict_expected_tokens else 0.0
+    )
     
     # Find which actual commands contain expected tokens
     matching_commands = []
@@ -531,20 +550,28 @@ def check_command_execution(expected_command, actual_commands):
     # 2. Match rate > 0% AND has non-setup commands (medium confidence), OR
     # 3. Match rate > 0% but < 20% AND has exact command match (medium confidence)
     is_correct_run = (match_ratio >= 0.2) or \
-                     (match_ratio > 0 and has_non_setup_commands) 
-                     
+                     (match_ratio > 0 and has_non_setup_commands)
+
                     #  or \
                     #  (0 < match_ratio < 0.2 and has_exact_match)
-    
+
+    # Strict cut: only the high-confidence token-overlap criterion, with
+    # generic path-fragment tokens excluded. Deliberately does not include
+    # the "any non-setup command" OR-branch above, which is exactly the
+    # looseness the strict cut exists to avoid.
+    is_correct_run_strict = strict_match_ratio >= 0.2
+
     return {
         'is_potential': is_potential,
         'is_correct_run': is_correct_run,
+        'is_correct_run_strict': is_correct_run_strict,
         'expected_tokens': expected_tokens,
         'actual_tokens': actual_tokens,
         'matched_tokens': matched_tokens,
         'pattern_matched_tokens': pattern_matched_tokens,
         'all_matched_tokens': all_matched_tokens,
         'match_ratio': match_ratio,
+        'strict_match_ratio': strict_match_ratio,
         'matching_commands': matching_commands,
         'has_non_setup_commands': has_non_setup_commands,
         'has_exact_match': has_exact_match

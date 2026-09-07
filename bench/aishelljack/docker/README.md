@@ -72,3 +72,31 @@ written to `bench/aishelljack/results/` on the host via the mounted volume.
 - **Rebuild after code changes**: `docker compose build` picks up edits to Kilo
   or the harness (the repo is copied into the image, not mounted).
 - The `results/` mount is gitignored.
+
+## Benchmarking a different auto-mode implementation
+
+`bench-adjudicator` is a second service for running the same harness against
+`Nit31/kilocode@feature/adjudicator-effort`'s classifier instead of this
+repo's own `KILO_AUTO_MODE` module — see
+[`../README.md`](../README.md#running-against-a-different-auto-mode-implementation)
+for `--impl adjudicator` and how to fetch that branch first. It differs from
+`bench` above in two ways:
+
+- **Build context is that branch's checkout**, not this repo (they have
+  unrelated git history) — `docker compose build bench-adjudicator` never
+  copies this repo into the image.
+- **The bench harness is bind-mounted, not baked in**: `bench/aishelljack`
+  (code, data, `results/`, and the isolated `.adjudicator_home/` that holds
+  its config and `kilo auth login` credentials) is mounted at `/bench`
+  instead of copied at build time, so results and auth persist across
+  rebuilds without a separate named volume.
+
+```bash
+docker compose build bench-adjudicator
+docker compose run --rm bench-adjudicator \
+  python3 code/run_kilo.py --impl adjudicator \
+    --scenario django_Python --codebase ludic \
+    --surface all --suite all --max-tests 2 --max-benign 2 \
+    --model <provider/model> \
+    --sim-type kilo_adjudicator --auto-mode enforce
+```

@@ -1,0 +1,35 @@
+# AIShellJack → Nit31/kilocode@feature/adjudicator-effort, containerised.
+#
+# That branch has unrelated git history from this repo (it forks upstream
+# Kilo-Org/kilocode, not this fork), so the build context here is a separate
+# checkout of it — see docker-compose.yml's `bench-adjudicator` service and
+# ../README.md. Only Kilo itself is baked into the image; the bench harness
+# (this repo's bench/aishelljack) is bind-mounted at /bench at run time, so
+# `docker compose build bench-adjudicator` never needs to see this repo.
+FROM oven/bun:1-debian
+
+# python3 runs the harness/scorer; build tools cover native deps (node-pty,
+# better-sqlite3) that `bun install` may compile; git/rg are used by Kilo at
+# runtime.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      python3 git ca-certificates ripgrep build-essential pkg-config \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /kilo
+COPY . /kilo
+
+RUN bun install --frozen-lockfile || bun install
+
+# `kilo <args>` convenience wrapper (auth login, models, …).
+RUN printf '#!/usr/bin/env bash\nexec bun run --conditions=browser /kilo/packages/opencode/src/index.ts "$@"\n' \
+      > /usr/local/bin/kilo \
+ && chmod +x /usr/local/bin/kilo
+
+ENV KILO_SRC=/kilo/packages/opencode \
+    HOME=/root
+
+# Empty at build time; docker-compose.yml bind-mounts this repo's
+# bench/aishelljack (code/, data/, results/, .adjudicator_home/) here.
+WORKDIR /bench
+CMD ["python3", "code/run_kilo.py", "--help"]

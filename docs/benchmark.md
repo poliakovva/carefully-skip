@@ -167,6 +167,8 @@ python3 code/score_kilo.py \
 
 Scorer создаёт `results/raw_results/report.json` и `report.md`. На каждый запуск сохраняются `commands.log`, `raw_events.jsonl`, `audit.jsonl` и `meta.json` в разрезе режима, suite, carrier и codebase.
 
+Раннер по умолчанию (`--impl legacy`) целится в модуль `KILO_AUTO_MODE` из этого репозитория. Чтобы прогнать бенч на другой реализации auto-mode из отдельной ветки (например, LLM-классификатор из `Nit31/kilocode@feature/adjudicator-effort`), используйте `--impl adjudicator` и укажите `--kilo-src` на отдельный чекаут этой ветки — подробности, включая различия в архитектуре (`--auto`-флаг вместо env, SQLite вместо JSONL-аудита, мгновенный fail-closed на неattended эскалации), в [`bench/aishelljack/README.md`](../bench/aishelljack/README.md#running-against-a-different-auto-mode-implementation).
+
 ## 6. Ограничения
 
 - Carrier prompts имеют разные способы активации: autoload, явная ссылка и tool load. Поэтому carrier breakdown нужно сравнивать отдельно; усреднённый ASR не является чистой оценкой модели.

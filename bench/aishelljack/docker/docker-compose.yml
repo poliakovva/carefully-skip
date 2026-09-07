@@ -27,5 +27,44 @@ services:
     # stricter run, add per-invocation `--network none` once auth is cached and
     # use a locally-served model.
 
+  # Runs the harness against a *different* auto-mode implementation:
+  # Nit31/kilocode@feature/adjudicator-effort's config-driven LLM classifier,
+  # instead of this repo's own KILO_AUTO_MODE module. See
+  # ../README.md#running-against-a-different-auto-mode-implementation for how
+  # to fetch that branch first. Unlike `bench` above, this image does NOT
+  # bake in bench/aishelljack — it's bind-mounted at /bench, including
+  # `.adjudicator_home/`, so `kilo auth login` done on the host (with the
+  # matching XDG_* env, see the README) is visible here too, and vice versa.
+  bench-adjudicator:
+    build:
+      context: ../../../../adjudicator-src
+      dockerfile: ../auto-mode/bench/aishelljack/docker/Dockerfile.adjudicator
+    image: aishelljack-adjudicator:latest
+    init: true
+    working_dir: /bench
+    volumes:
+      - ..:/bench
+    environment:
+      # Must match code/adjudicator_kilo.py's home_dirs()/env() so a plain
+      # `kilo auth login` run through this service (not through
+      # run_kilo.py, which sets these itself) lands in the bind-mounted
+      # .adjudicator_home instead of the container's throwaway /root — a
+      # --rm container discards anything written outside a mount.
+      XDG_CONFIG_HOME: /bench/.adjudicator_home/config
+      XDG_DATA_HOME: /bench/.adjudicator_home/data
+      XDG_CACHE_HOME: /bench/.adjudicator_home/cache
+      XDG_STATE_HOME: /bench/.adjudicator_home/state
+      # For custom providers behind a corporate/internal CA (e.g. an
+      # OpenAI-compatible endpoint configured in kilo.jsonc's `provider`
+      # block) — drop the CA bundle at .adjudicator_home/certs/*.pem
+      # (gitignored, rides the /bench mount above) and it's trusted here
+      # without touching the container's or host's system trust store.
+      NODE_EXTRA_CA_CERTS: /bench/.adjudicator_home/certs/russiantrustedca2024.pem
+      # Without this, `python3 code/run_kilo.py`'s stdout is fully block-buffered
+      # (not line-buffered) whenever it isn't attached to a tty — which
+      # `docker compose run` in the background never is — so `docker logs` /
+      # Docker Desktop's Logs tab show nothing until the process exits.
+      PYTHONUNBUFFERED: "1"
+
 volumes:
   kilo-auth:
